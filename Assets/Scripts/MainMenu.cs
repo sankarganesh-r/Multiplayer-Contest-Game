@@ -14,15 +14,20 @@ public class MainMenu : MonoBehaviourPunCallbacks
     public GameObject mainMenuPanel;
     public TMP_Text warningText;
 
+    void Awake()
+    {
+        string username = "Player" + Random.Range(1000, 9999);
+        PhotonNetwork.NickName = username;
+        PhotonNetwork.ConnectUsingSettings();
+    }
 
-
-// Start is called before the first frame update
+    // Start is called before the first frame update
     void Start()
     {
-        PhotonNetwork.ConnectUsingSettings();
         createRoomButton.onClick.AddListener(CreateRoom);
         JoinRoomButton.onClick.AddListener(JoinRoom);
     }
+
 
     public void CreateRoom()
     {
@@ -44,7 +49,7 @@ public class MainMenu : MonoBehaviourPunCallbacks
     {
         base.OnJoinedRoom();
         mainMenuPanel.SetActive(false);
-        warningText.text = "Room Joined";
+        warningText.text = "Room Joined " + PhotonNetwork.LocalPlayer.NickName;
     }
     
     // Update is called once per frame
