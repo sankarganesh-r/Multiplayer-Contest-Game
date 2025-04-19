@@ -11,8 +11,12 @@ public class UIManager : MonoBehaviourPunCallbacks
     public static UIManager Instance;
     public Button createRoomButton, JoinRoomButton, startRoundButton, foldButton, contestButton;
     public TMP_InputField createRoomInput, JoinRoomInput;
-    public GameObject mainMenuPanel, lobbyPanel, decisionPanel;
-    public TMP_Text warningText, numberText, timerText, userNameText, roomNameText;
+    public GameObject mainMenuPanel, lobbyPanel, decisionPanel, resultPanel;
+    public TMP_Text warningText, numberText, timerText, userNameText, roomNameText, decisionShowText, 
+        winnerText;
+    public GameObject lobbyPlayerNamePrefab, playerNameParent,playerNumberParent;
+
+    List<GameObject> playerList = new List<GameObject>();
 
     void Awake()
     {
@@ -20,6 +24,7 @@ public class UIManager : MonoBehaviourPunCallbacks
         string username = "Player" + Random.Range(1000, 9999);
         PhotonNetwork.NickName = username;
         PhotonNetwork.ConnectUsingSettings();
+        
     }
 
     // Start is called before the first frame update
@@ -27,15 +32,18 @@ public class UIManager : MonoBehaviourPunCallbacks
     {
         createRoomButton.onClick.AddListener(CreateRoom);
         JoinRoomButton.onClick.AddListener(JoinRoom);
-        startRoundButton.onClick.AddListener(()=>
-        {
-            GameManager.Instance.RoundStart();
-            decisionPanel.SetActive(true);
-            lobbyPanel.SetActive(false);
-            
-        });
+        startRoundButton.onClick.AddListener(()=> GameManager.Instance.RoundStart());
         foldButton.onClick.AddListener(OnFoldPressed);
         contestButton.onClick.AddListener(OnContestPressed);
+    }
+
+
+    public void StartRound()
+    {
+        decisionPanel.SetActive(true);
+        lobbyPanel.SetActive(false);
+        resultPanel.SetActive(false);
+        decisionShowText.text="";
     }
 
 
@@ -60,9 +68,21 @@ public class UIManager : MonoBehaviourPunCallbacks
         base.OnJoinedRoom();
         mainMenuPanel.SetActive(false);
         lobbyPanel.SetActive(true);
-        warningText.text = "Room Joined \n" + "Username "+PhotonNetwork.LocalPlayer.NickName;
+        //warningText.text = "Room Joined \n" + "Username "+PhotonNetwork.LocalPlayer.NickName;
         SetUserName(PhotonNetwork.LocalPlayer.NickName);
         SetRoomName(PhotonNetwork.CurrentRoom.Name);
+        ShowPlayerName(PhotonNetwork.LocalPlayer.NickName);
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (player.CustomProperties.TryGetValue("Number", out object number))
+            {
+                Debug.Log($"Player {player.NickName} has number {number}");
+                GameObject playersName = Instantiate(lobbyPlayerNamePrefab, playerNameParent.transform);
+                playersName.GetComponent<TMP_Text>().text = player.NickName;
+                playerList.Add(playersName);
+            }
+        }
+        startRoundButton.gameObject.SetActive(PhotonNetwork.IsMasterClient ? true : false);
     }
 
 
@@ -71,13 +91,28 @@ public class UIManager : MonoBehaviourPunCallbacks
         Debug.Log("Connected to Photon as " + PhotonNetwork.NickName);
         //PhotonNetwork.JoinLobby(); // or go straight to room creation
     }
+
+    public override void OnPlayerEnteredRoom(Player newPlayer)
+    {
+        Debug.Log("Player joined: " + newPlayer.NickName);
+        ShowPlayerName(newPlayer.NickName);
+    }
+
+
+    void ShowPlayerName(string username)
+    {
+        GameObject playersName = Instantiate(lobbyPlayerNamePrefab,playerNameParent.transform);
+        playersName.GetComponent<TMP_Text>().text = username;
+        playerList.Add(playersName);
+    }
     
 
     public void OnFoldPressed()
     {
         if (GameManager.Instance.currentState == GameState.DecisionPhase)
         {
-            GameManager.Instance.photonView.RPC("SubmitDecision", RpcTarget.MasterClient, "Fold");
+            decisionShowText.text="You're Selected FOLD!!!!";
+            GameManager.Instance.photonView.RPC("SubmitDecision", RpcTarget.AllBuffered, "Fold");
         }
     }
 
@@ -85,7 +120,8 @@ public class UIManager : MonoBehaviourPunCallbacks
     {
         if (GameManager.Instance.currentState == GameState.DecisionPhase)
         {
-            GameManager.Instance.photonView.RPC("SubmitDecision", RpcTarget.MasterClient, "Contest");
+            decisionShowText.text="You're Selected CONTEST!!!!";
+            GameManager.Instance.photonView.RPC("SubmitDecision", RpcTarget.AllBuffered, "Contest");
         }
     }
 
@@ -104,6 +140,28 @@ public class UIManager : MonoBehaviourPunCallbacks
         roomNameText.text=roomName;
     }
 
+    public void SetWinnerText(string winnerName)
+    {
+        decisionPanel.SetActive(false);
+        resultPanel.SetActive(true);
+        winnerText.text=winnerName;
+        foreach(var players in playerList){
+            Destroy(players);
+        }
+        playerList.Clear();
+        
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (player.CustomProperties.TryGetValue("Number", out object number))
+            {
+                Debug.Log($"Player {player.NickName} has number {number}");
+                GameObject playersName = Instantiate(lobbyPlayerNamePrefab, playerNumberParent.transform);
+                playersName.GetComponent<TMP_Text>().text = player.NickName + "  "+ number;
+                playerList.Add(playersName);
+            }
+        }
+    }
+
     public IEnumerator StartCountdown(float time)
     {
         while (time > 0)
@@ -115,11 +173,5 @@ public class UIManager : MonoBehaviourPunCallbacks
 
         timerText.text = "Time's up!";
         // Optionally, do something else here
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }

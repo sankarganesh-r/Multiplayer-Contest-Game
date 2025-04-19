@@ -1,24 +1,10 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
-
-
-public class PlayerData
-{
-    public int number;
-    public Decision decision;
-    public int chips;
-}
-
-public enum Decision
-{
-    None,
-    Fold,
-    Contest
-}
 
 public enum GameState { Waiting, RoundStart, DecisionPhase, RevealWinner, RoundEnd }
 
@@ -53,7 +39,7 @@ public class GameManager : MonoBehaviourPunCallbacks
 
         foreach (Player player in PhotonNetwork.PlayerList)
         {
-            int randomNum = Random.Range(1, 101);
+            int randomNum = UnityEngine.Random.Range(1, 101);
             playerNumbers[player] = randomNum;
            
             Hashtable props = new Hashtable { { "Number", randomNum }, { "Decision", "Undecided" } };
@@ -61,7 +47,7 @@ public class GameManager : MonoBehaviourPunCallbacks
         }
         
         yield return new WaitForSeconds(1f);
-        UIManager.Instance.SetNumber(playerNumbers[PhotonNetwork.LocalPlayer]);
+       
         photonView.RPC("BeginDecisionPhase", RpcTarget.AllBuffered, PhotonNetwork.Time);
     }
 
@@ -69,6 +55,8 @@ public class GameManager : MonoBehaviourPunCallbacks
     [PunRPC]
     void BeginDecisionPhase(double networkTime)
     {
+        UIManager.Instance.SetNumber((int)PhotonNetwork.LocalPlayer.CustomProperties["Number"]);
+        UIManager.Instance.StartRound();
         currentState = GameState.DecisionPhase;
         roundStartTime = (float)networkTime;
         StartCoroutine(WaitForDecisionEnd());
@@ -110,12 +98,17 @@ public class GameManager : MonoBehaviourPunCallbacks
             object decisionObj;
             if (player.CustomProperties.TryGetValue("Decision", out decisionObj) && decisionObj.ToString() == "Contest")
             {
-                contenders.Add(player);
-                int number = (int)player.CustomProperties["Number"];
-                if (number > highestNum)
+                Debug.Log(" ++++++  "+player.ActorNumber+" "+decisionObj);
+                if (player.CustomProperties.TryGetValue("Number", out object numberObj))
                 {
-                    highestNum = number;
-                    winner = player;
+                    Debug.Log(" @@@@@  "+player.ActorNumber+" "+decisionObj+" "+numberObj);
+                    contenders.Add(player);
+                    int number = (int)numberObj;
+                    if (number > highestNum)
+                    {
+                        highestNum = number;
+                        winner = player;
+                    }
                 }
             }
         }
@@ -128,13 +121,17 @@ public class GameManager : MonoBehaviourPunCallbacks
     void AnnounceWinner(string winnerName, int winningNumber)
     {
         Debug.Log("Winner: " + winnerName + " with number " + winningNumber);
+        if(winnerName.Equals(PhotonNetwork.LocalPlayer.ActorNumber))
+            UIManager.Instance.SetWinnerText("You're the Winner "+ "with number " + winningNumber);
+        else
+            UIManager.Instance.SetWinnerText("The Winner is " + winnerName + " with number " + winningNumber);
         StartCoroutine(RoundCooldown());
     }
 
     IEnumerator RoundCooldown()
     {
         currentState = GameState.RoundEnd;
-        yield return new WaitForSeconds(5f);
+        yield return new WaitForSeconds(15f);
 
         if (PhotonNetwork.IsMasterClient)
         {
