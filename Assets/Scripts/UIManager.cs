@@ -83,6 +83,8 @@ public class UIManager : MonoBehaviourPunCallbacks
             }
         }
         startRoundButton.gameObject.SetActive(PhotonNetwork.IsMasterClient ? true : false);
+
+        GameManager.Instance.InitializePlayerChips();
     }
 
 

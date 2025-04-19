@@ -13,6 +13,8 @@ public class GameManager : MonoBehaviourPunCallbacks
     public static GameManager Instance;
     public GameState currentState = GameState.Waiting;
     public float decisionTime = 10f;
+    public int defaultChips = 100;
+    public int betAmount = 10;
 
     private Dictionary<Player, int> playerNumbers = new Dictionary<Player, int>();
     private Dictionary<Player, string> playerDecisions = new Dictionary<Player, string>();
@@ -27,6 +29,18 @@ public class GameManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.IsMasterClient)
         {
             StartCoroutine(StartRound());
+        }
+    }
+
+    public void InitializePlayerChips()
+    {
+        foreach (Player player in PhotonNetwork.PlayerList)
+        {
+            if (!player.CustomProperties.ContainsKey("Chips"))
+            {
+                Hashtable chipInit = new Hashtable { { "Chips", defaultChips } };
+                player.SetCustomProperties(chipInit);
+            }
         }
     }
 
@@ -82,7 +96,17 @@ public class GameManager : MonoBehaviourPunCallbacks
         playerDecisions[player] = decision;
 
         Hashtable props = new Hashtable { { "Decision", decision } };
+        if (decision == "Contest")
+        {
+            if (player.CustomProperties.TryGetValue("Chips", out object chipObj))
+            {
+                int chips = (int)chipObj;
+                props["Chips"] = Mathf.Max(0, chips - betAmount);
+            }
+        }
+
         player.SetCustomProperties(props);
+        Debug.Log("Submit Decision"+ player.ActorNumber +" "+ decision);
     }
 
 
@@ -113,6 +137,16 @@ public class GameManager : MonoBehaviourPunCallbacks
             }
         }
 
+        if (winner != null)
+        {
+            int pot = betAmount * contenders.Count;
+            if (winner.CustomProperties.TryGetValue("Chips", out object winChipsObj))
+            {
+                int winnerChips = (int)winChipsObj;
+                winner.SetCustomProperties(new Hashtable { { "Chips", winnerChips + pot } });
+            }
+        }
+
         photonView.RPC("AnnounceWinner", RpcTarget.AllBuffered, winner?.NickName ?? "No Winner", highestNum);
     }
 
@@ -138,5 +172,4 @@ public class GameManager : MonoBehaviourPunCallbacks
             StartCoroutine(StartRound());
         }
     }
-   
 }
