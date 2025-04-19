@@ -114,7 +114,7 @@ public class UIManager : MonoBehaviourPunCallbacks
         if (GameManager.Instance.currentState == GameState.DecisionPhase)
         {
             decisionShowText.text="You're Selected FOLD!!!!";
-            GameManager.Instance.photonView.RPC("SubmitDecision", RpcTarget.AllBuffered, "Fold");
+            GameManager.Instance.SubmitDecision("Fold");
         }
     }
 
@@ -123,7 +123,7 @@ public class UIManager : MonoBehaviourPunCallbacks
         if (GameManager.Instance.currentState == GameState.DecisionPhase)
         {
             decisionShowText.text="You're Selected CONTEST!!!!";
-            GameManager.Instance.photonView.RPC("SubmitDecision", RpcTarget.AllBuffered, "Contest");
+            GameManager.Instance.SubmitDecision("Contest");
         }
     }
 

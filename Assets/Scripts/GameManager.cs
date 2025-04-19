@@ -17,7 +17,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     public int betAmount = 10;
 
     private Dictionary<Player, int> playerNumbers = new Dictionary<Player, int>();
-    private Dictionary<Player, string> playerDecisions = new Dictionary<Player, string>();
+    private Dictionary<int, string> playerDecisions = new Dictionary<int, string>();
 
     private float roundStartTime;
 
@@ -89,24 +89,35 @@ public class GameManager : MonoBehaviourPunCallbacks
     }
 
 
-    [PunRPC]
-    public void SubmitDecision(string decision)
+     public void SubmitDecision(string decision)
     {
-        Player player = PhotonNetwork.LocalPlayer;
-        playerDecisions[player] = decision;
+        int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
 
-        Hashtable props = new Hashtable { { "Decision", decision } };
-        if (decision == "Contest")
+        if (!playerDecisions.ContainsKey(actorNumber))
         {
-            if (player.CustomProperties.TryGetValue("Chips", out object chipObj))
-            {
-                int chips = (int)chipObj;
-                props["Chips"] = Mathf.Max(0, chips - betAmount);
-            }
-        }
+            playerDecisions[actorNumber] = decision;
 
-        player.SetCustomProperties(props);
-        Debug.Log("Submit Decision"+ player.ActorNumber +" "+ decision);
+            Hashtable props = new Hashtable { { "Decision", decision } };
+
+            if (decision == "Contest")
+            {
+                if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Chips", out object chipObj))
+                {
+                    int chips = (int)chipObj;
+                    props["Chips"] = Mathf.Max(0, chips - betAmount);
+                }
+            }
+
+            PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+
+            photonView.RPC("RegisterDecision", RpcTarget.MasterClient, actorNumber, decision);
+        }
+    }
+
+    [PunRPC]
+    public void RegisterDecision(int actorNumber, string decision)
+    {
+        playerDecisions[actorNumber] = decision;
     }
 
 
