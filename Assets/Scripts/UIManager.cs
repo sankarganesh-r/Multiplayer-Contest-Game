@@ -149,7 +149,7 @@ public class UIManager : MonoBehaviourPunCallbacks
 
     public void SetChipCount(int chips)
     {
-        chipsText.text = $"Chips - {chips.ToString()}";
+        chipsText.text = $"Chips {chips.ToString()}";
     }
 
     public void SetUserName(string userName)
