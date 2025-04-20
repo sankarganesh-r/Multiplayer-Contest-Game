@@ -10,9 +10,9 @@ using UnityEngine.UI;
 public class UIManager : MonoBehaviourPunCallbacks
 {
     public static UIManager Instance;
-    public Button createRoomButton, JoinRoomButton, startRoundButton, foldButton, contestButton;
+    public Button createRoomButton, JoinRoomButton, startRoundButton, foldButton, contestButton, playButton;
     public TMP_InputField createRoomInput, JoinRoomInput;
-    public GameObject mainMenuPanel, lobbyPanel, decisionPanel, resultPanel;
+    public GameObject mainMenuPanel, lobbyPanel, decisionPanel, resultPanel, playPanel;
     public TMP_Text warningText, numberText, timerText, userNameText, roomNameText, decisionShowText,
         winnerText, chipsText;
     public GameObject lobbyPlayerNamePrefab, playerNameParent, playerNumberParent;
@@ -31,13 +31,18 @@ public class UIManager : MonoBehaviourPunCallbacks
     // Start is called before the first frame update
     void Start()
     {
-
+        playButton.onClick.RemoveAllListeners();
         createRoomButton.onClick.RemoveAllListeners();
         JoinRoomButton.onClick.RemoveAllListeners();
         startRoundButton.onClick.RemoveAllListeners();
         foldButton.onClick.RemoveAllListeners();
         contestButton.onClick.RemoveAllListeners();
 
+        playButton.onClick.AddListener(()=>
+        {
+            playPanel.SetActive(false);
+            mainMenuPanel.SetActive(true);
+        });
         createRoomButton.onClick.AddListener(CreateRoom);
         JoinRoomButton.onClick.AddListener(JoinRoom);
         startRoundButton.onClick.AddListener(() =>
