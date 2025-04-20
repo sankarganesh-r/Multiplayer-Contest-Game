@@ -15,14 +15,9 @@ public class GameManager : MonoBehaviourPunCallbacks
     public float decisionTime = 10f;
     public int defaultChips = 100;
     public int betAmount = 10;
-
-    private Dictionary<Player, int> playerNumbers = new Dictionary<Player, int>();
-    private Dictionary<int, string> playerDecisions = new Dictionary<int, string>();
-
     private float roundStartTime;
-
     private void Awake() => Instance = this;
-    
+
 
     public void RoundStart()
     {
@@ -44,24 +39,17 @@ public class GameManager : MonoBehaviourPunCallbacks
         }
     }
 
-
-     IEnumerator StartRound()
+    IEnumerator StartRound()
     {
         currentState = GameState.RoundStart;
-        playerNumbers.Clear();
-        playerDecisions.Clear();
-
         foreach (Player player in PhotonNetwork.PlayerList)
         {
             int randomNum = UnityEngine.Random.Range(1, 101);
-            playerNumbers[player] = randomNum;
-           
             Hashtable props = new Hashtable { { "Number", randomNum }, { "Decision", "Undecided" } };
             player.SetCustomProperties(props);
         }
-        
+        photonView.RPC("SyncChipsUI", RpcTarget.AllBuffered);
         yield return new WaitForSeconds(1f);
-       
         photonView.RPC("BeginDecisionPhase", RpcTarget.AllBuffered, PhotonNetwork.Time);
     }
 
@@ -69,10 +57,20 @@ public class GameManager : MonoBehaviourPunCallbacks
     [PunRPC]
     void BeginDecisionPhase(double networkTime)
     {
-        UIManager.Instance.SetNumber((int)PhotonNetwork.LocalPlayer.CustomProperties["Number"]);
-        UIManager.Instance.StartRound();
         currentState = GameState.DecisionPhase;
         roundStartTime = (float)networkTime;
+
+
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Number", out object num))
+            UIManager.Instance.SetNumber((int)num);
+
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Chips", out object chips))
+            UIManager.Instance.SetChipCount((int)chips);
+
+
+        UIManager.Instance.decisionShowText.text = "Make your choice!";
+
+        UIManager.Instance.StartRound();
         StartCoroutine(WaitForDecisionEnd());
     }
 
@@ -89,37 +87,26 @@ public class GameManager : MonoBehaviourPunCallbacks
     }
 
 
-     public void SubmitDecision(string decision)
+    public void SubmitDecision(string decision)
     {
-        int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+        Debug.Log("Submit Decision");
+        Hashtable props = new Hashtable { { "Decision", decision } };
+        Debug.Log("Decision " + decision);
 
-        if (!playerDecisions.ContainsKey(actorNumber))
+        if (decision == "Contest")
         {
-            playerDecisions[actorNumber] = decision;
-
-            Hashtable props = new Hashtable { { "Decision", decision } };
-
-            if (decision == "Contest")
+            if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Chips", out object chipObj))
             {
-                if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Chips", out object chipObj))
-                {
-                    int chips = (int)chipObj;
-                    props["Chips"] = Mathf.Max(0, chips - betAmount);
-                }
+                int chips = (int)chipObj;
+                int newChips = Mathf.Max(0, chips - betAmount);
+                props["Chips"] = newChips;
+                UIManager.Instance.SetChipCount(newChips);
             }
-
-            PhotonNetwork.LocalPlayer.SetCustomProperties(props);
-
-            photonView.RPC("RegisterDecision", RpcTarget.MasterClient, actorNumber, decision);
         }
-    }
 
-    [PunRPC]
-    public void RegisterDecision(int actorNumber, string decision)
-    {
-        playerDecisions[actorNumber] = decision;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        PhotonNetwork.LocalPlayer.CustomProperties["Decision"] = decision;
     }
-
 
     void DetermineWinner()
     {
@@ -130,46 +117,55 @@ public class GameManager : MonoBehaviourPunCallbacks
 
         foreach (Player player in PhotonNetwork.PlayerList)
         {
-            object decisionObj;
-            if (player.CustomProperties.TryGetValue("Decision", out decisionObj) && decisionObj.ToString() == "Contest")
+            if (player.CustomProperties.TryGetValue("Decision", out object decisionObj))
             {
-                Debug.Log(" ++++++  "+player.ActorNumber+" "+decisionObj);
-                if (player.CustomProperties.TryGetValue("Number", out object numberObj))
+                Debug.Log("Final Decision " + player.NickName + " " + decisionObj);
+                if (decisionObj.ToString() == "Contest")
                 {
-                    Debug.Log(" @@@@@  "+player.ActorNumber+" "+decisionObj+" "+numberObj);
-                    contenders.Add(player);
-                    int number = (int)numberObj;
-                    if (number > highestNum)
+                    if (player.CustomProperties.TryGetValue("Number", out object numberObj))
                     {
-                        highestNum = number;
-                        winner = player;
+                        contenders.Add(player);
+                        int number = (int)numberObj;
+                        if (number > highestNum)
+                        {
+                            highestNum = number;
+                            winner = player;
+                        }
                     }
                 }
             }
         }
 
-        if (winner != null)
+        if (winner != null && winner.CustomProperties.TryGetValue("Chips", out object winChipsObj))
         {
+            int winnerChips = (int)winChipsObj;
             int pot = betAmount * contenders.Count;
-            if (winner.CustomProperties.TryGetValue("Chips", out object winChipsObj))
-            {
-                int winnerChips = (int)winChipsObj;
-                winner.SetCustomProperties(new Hashtable { { "Chips", winnerChips + pot } });
-            }
+            winner.SetCustomProperties(new Hashtable { { "Chips", winnerChips + pot } });
         }
 
+        photonView.RPC("SyncChipsUI", RpcTarget.AllBuffered);
         photonView.RPC("AnnounceWinner", RpcTarget.AllBuffered, winner?.NickName ?? "No Winner", highestNum);
     }
 
+    [PunRPC]
+    void SyncChipsUI()
+    {
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Chips", out object chipObj))
+        {
+            UIManager.Instance.SetChipCount((int)chipObj);
+        }
+    }
 
     [PunRPC]
     void AnnounceWinner(string winnerName, int winningNumber)
     {
         Debug.Log("Winner: " + winnerName + " with number " + winningNumber);
-        if(winnerName.Equals(PhotonNetwork.LocalPlayer.ActorNumber))
-            UIManager.Instance.SetWinnerText("You're the Winner "+ "with number " + winningNumber);
+        if (winningNumber > 0)
+            UIManager.Instance.SetWinnerText(winnerName == PhotonNetwork.LocalPlayer.NickName ?
+                $"You're the Winner with number {winningNumber}" :
+                $"The Winner is {winnerName} with number {winningNumber}");
         else
-            UIManager.Instance.SetWinnerText("The Winner is " + winnerName + " with number " + winningNumber);
+            UIManager.Instance.SetWinnerText("Balanced Round");
         StartCoroutine(RoundCooldown());
     }
 

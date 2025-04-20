@@ -13,7 +13,7 @@ public class UIManager : MonoBehaviourPunCallbacks
     public TMP_InputField createRoomInput, JoinRoomInput;
     public GameObject mainMenuPanel, lobbyPanel, decisionPanel, resultPanel;
     public TMP_Text warningText, numberText, timerText, userNameText, roomNameText, decisionShowText, 
-        winnerText;
+        winnerText, chipsText;
     public GameObject lobbyPlayerNamePrefab, playerNameParent,playerNumberParent;
 
     List<GameObject> playerList = new List<GameObject>();
@@ -30,6 +30,13 @@ public class UIManager : MonoBehaviourPunCallbacks
     // Start is called before the first frame update
     void Start()
     {
+
+        createRoomButton.onClick.RemoveAllListeners();
+        JoinRoomButton.onClick.RemoveAllListeners();
+        startRoundButton.onClick.RemoveAllListeners();
+        foldButton.onClick.RemoveAllListeners();
+        contestButton.onClick.RemoveAllListeners();
+
         createRoomButton.onClick.AddListener(CreateRoom);
         JoinRoomButton.onClick.AddListener(JoinRoom);
         startRoundButton.onClick.AddListener(()=> GameManager.Instance.RoundStart());
@@ -71,20 +78,26 @@ public class UIManager : MonoBehaviourPunCallbacks
         //warningText.text = "Room Joined \n" + "Username "+PhotonNetwork.LocalPlayer.NickName;
         SetUserName(PhotonNetwork.LocalPlayer.NickName);
         SetRoomName(PhotonNetwork.CurrentRoom.Name);
-        ShowPlayerName(PhotonNetwork.LocalPlayer.NickName);
+        RefreshLobbyPlayerList();
+        startRoundButton.gameObject.SetActive(PhotonNetwork.IsMasterClient);
+        GameManager.Instance.InitializePlayerChips();
+    }
+
+
+    void RefreshLobbyPlayerList()
+    {
+        foreach (Transform child in playerNameParent.transform)
+        {
+            Destroy(child.gameObject);
+        }
+        playerList.Clear();
+
         foreach (var player in PhotonNetwork.PlayerList)
         {
-            if (player.CustomProperties.TryGetValue("Number", out object number))
-            {
-                Debug.Log($"Player {player.NickName} has number {number}");
-                GameObject playersName = Instantiate(lobbyPlayerNamePrefab, playerNameParent.transform);
-                playersName.GetComponent<TMP_Text>().text = player.NickName;
-                playerList.Add(playersName);
-            }
+            GameObject playersName = Instantiate(lobbyPlayerNamePrefab, playerNameParent.transform);
+            playersName.GetComponent<TMP_Text>().text = player.NickName;
+            playerList.Add(playersName);
         }
-        startRoundButton.gameObject.SetActive(PhotonNetwork.IsMasterClient ? true : false);
-
-        GameManager.Instance.InitializePlayerChips();
     }
 
 
@@ -97,16 +110,9 @@ public class UIManager : MonoBehaviourPunCallbacks
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         Debug.Log("Player joined: " + newPlayer.NickName);
-        ShowPlayerName(newPlayer.NickName);
+        RefreshLobbyPlayerList();
     }
 
-
-    void ShowPlayerName(string username)
-    {
-        GameObject playersName = Instantiate(lobbyPlayerNamePrefab,playerNameParent.transform);
-        playersName.GetComponent<TMP_Text>().text = username;
-        playerList.Add(playersName);
-    }
     
 
     public void OnFoldPressed()
@@ -130,6 +136,11 @@ public class UIManager : MonoBehaviourPunCallbacks
     public void SetNumber(int num)
     {
         numberText.text=$"Your Number is {num}";
+    }
+
+    public void SetChipCount(int chips)
+    {
+        chipsText.text=chips.ToString();
     }
 
     public void SetUserName(string userName)
@@ -163,7 +174,6 @@ public class UIManager : MonoBehaviourPunCallbacks
             }
         }
     }
-
     public IEnumerator StartCountdown(float time)
     {
         while (time > 0)
