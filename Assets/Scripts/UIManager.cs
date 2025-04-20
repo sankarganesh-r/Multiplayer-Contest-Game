@@ -144,7 +144,7 @@ public class UIManager : MonoBehaviourPunCallbacks
 
     public void SetNumber(int num)
     {
-        numberText.text = $"Your Number is {num}";
+        numberText.text = $"Your Number is {num}\n Please choose to Fold or Contest.";
     }
 
     public void SetChipCount(int chips)
@@ -188,7 +188,7 @@ public class UIManager : MonoBehaviourPunCallbacks
     {
         while (time > 0)
         {
-            timerText.text = Mathf.Ceil(time).ToString() + "s";
+            timerText.text = $"Time left: \n{Mathf.Ceil(time).ToString() } s";
             yield return new WaitForSeconds(1f);
             time -= 1f;
         }
